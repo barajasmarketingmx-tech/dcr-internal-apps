@@ -1,7 +1,7 @@
 export default async function handler(req, res) {
 
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "PATCH, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
   if (req.method === "OPTIONS") {
@@ -10,83 +10,46 @@ export default async function handler(req, res) {
 
   try {
 
-    const employee = req.query.employee;
+    if (req.method !== "PATCH") {
+      return res.status(405).json({ error: "Method not allowed" });
+    }
 
-    if (!employee) {
+    const { recordId, Status } = req.body;
 
+    if (!recordId || !Status) {
       return res.status(400).json({
-        error: "Employee parameter required"
+        error: "Missing recordId or Status"
       });
-
     }
 
     const BASE_ID = process.env.BASE_ID;
     const AIRTABLE_TOKEN = process.env.AIRTABLE_TOKEN;
 
-    if (!BASE_ID || !AIRTABLE_TOKEN) {
-
-      return res.status(500).json({
-        error: "Missing environment variables"
-      });
-
-    }
-
-    const TABLE_NAME = "Tasks";
-
-    const safeEmployee =
-      employee.replace(/"/g, '\\"');
-
-    const formula = `
-      AND(
-        FIND(
-          LOWER("${safeEmployee}"),
-          LOWER(ARRAYJOIN({Employee Names}))
-        ),
-        NOT({Completed})
-      )
-    `;
-
     const url =
-      `https://api.airtable.com/v0/${BASE_ID}/${encodeURIComponent(TABLE_NAME)}` +
-      `?filterByFormula=${encodeURIComponent(formula)}`;
+      `https://api.airtable.com/v0/${BASE_ID}/Tasks/${recordId}`;
 
     const response = await fetch(url, {
-
-      method: "GET",
-
+      method: "PATCH",
       headers: {
         Authorization: `Bearer ${AIRTABLE_TOKEN}`,
         "Content-Type": "application/json"
-      }
-
+      },
+      body: JSON.stringify({
+        fields: {
+          Status: Status
+        }
+      })
     });
 
-    if (!response.ok) {
-
-      const errorText =
-        await response.text();
-
-      return res.status(response.status).json({
-        error: "Airtable request failed",
-        details: errorText
-      });
-
-    }
-
-    const data =
-      await response.json();
+    const data = await response.json();
 
     return res.status(200).json(data);
 
   } catch (error) {
 
-    console.error(error);
-
     return res.status(500).json({
-      error: "Server error",
-      details: error.message
+      error: error.message
     });
 
   }
-
 }
