@@ -4,22 +4,14 @@ export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-  if (req.method === "OPTIONS") {
-    return res.status(200).end();
-  }
+  if (req.method === "OPTIONS") return res.status(200).end();
 
   try {
-
-    if (req.method !== "POST") {
-      return res.status(405).json({ error: "Method not allowed" });
-    }
 
     const { recordId, text, user } = req.body;
 
     if (!recordId || !text) {
-      return res.status(400).json({
-        error: "Missing recordId or text"
-      });
+      return res.status(400).json({ error: "Missing data" });
     }
 
     const BASE_ID = process.env.BASE_ID;
@@ -27,7 +19,7 @@ export default async function handler(req, res) {
 
     const url = `https://api.airtable.com/v0/${BASE_ID}/Tasks/${recordId}`;
 
-    // 1. GET current updates
+    // 1. GET current record
     const getRes = await fetch(url, {
       headers: {
         Authorization: `Bearer ${AIRTABLE_TOKEN}`
@@ -36,24 +28,17 @@ export default async function handler(req, res) {
 
     const data = await getRes.json();
 
-    let updates = [];
+    let existing = data.fields["Status Updates"] || "";
 
-    try {
-      updates = JSON.parse(data.fields["Status Updates"] || "[]");
-    } catch (e) {
-      updates = [];
-    }
+    // 2. clean HTML entry (ONLY HTML, NO JSON)
+    const date = new Date().toLocaleDateString();
 
-    // 2. new update object
-    const newUpdate = {
-      text: text,
-      date: new Date().toISOString().split("T")[0],
-      user: user || "Unknown"
-    };
+    const newEntry = `<br><br><b>${date}</b> - <i>${text}</i>`;
 
-    updates.push(newUpdate);
+    // 3. append safely
+    const updated = existing + newEntry;
 
-    // 3. save back
+    // 4. save back
     const patchRes = await fetch(url, {
       method: "PATCH",
       headers: {
@@ -62,7 +47,7 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         fields: {
-          "Status Updates": JSON.stringify(updates)
+          "Status Updates": updated
         }
       })
     });
@@ -72,8 +57,6 @@ export default async function handler(req, res) {
     return res.status(200).json(result);
 
   } catch (error) {
-    return res.status(500).json({
-      error: error.message
-    });
+    return res.status(500).json({ error: error.message });
   }
 }
