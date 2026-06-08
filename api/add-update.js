@@ -42,13 +42,8 @@ export default async function handler(req, res) {
     // 2. SAFE existing value (HTML STRING SYSTEM)
     let existing = data.fields["Status Updates"] || "";
 
-    // 3. CLEAN entry (HTML format)
-    const date = new Date().toLocaleDateString();
-
-    const newEntry = `<br><br><b>${date}</b> - <i>${text}</i>`;
-
-    // 4. APPEND safely (NO JSON, NO PARSE)
-    const updated = existing + newEntry;
+   // 3. APPEND safely
+const updated = existing + text;
 
     // 5. PATCH Airtable
     const patchRes = await fetch(url, {
